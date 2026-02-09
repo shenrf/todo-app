@@ -1,6 +1,21 @@
 import tkinter as tk
 from tkinter import Canvas
-import models
+import json
+import urllib.request
+import urllib.parse
+
+API_BASE = "https://todo-app-qko4.onrender.com/api/todos"
+CATEGORIES = ["Ruofei", "Ruiqi", "Family"]
+
+
+def _api(method, path="", body=None):
+    """Call the remote API. Returns parsed JSON or None."""
+    url = API_BASE + path
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read())
 
 # --- Color Palette (warm light) ---
 BG = "#faf8f5"           # warm cream
@@ -67,8 +82,7 @@ class RoundedFrame(Canvas):
 
 class TodoApp:
     def __init__(self) -> None:
-        models.init_db()
-        self.current_category = models.CATEGORIES[0]
+        self.current_category = CATEGORIES[0]
 
         self.root = tk.Tk()
         self.root.title("Todo")
@@ -102,7 +116,7 @@ class TodoApp:
 
         self.tab_buttons = {}
         self.tab_indicators = {}
-        for cat in models.CATEGORIES:
+        for cat in CATEGORIES:
             frame = tk.Frame(tab_bar, bg=BG)
             frame.pack(side="left", padx=(0, 4), fill="x", expand=True)
 
@@ -217,7 +231,8 @@ class TodoApp:
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
 
-        todos = models.get_todos(self.current_category)
+        cat_param = urllib.parse.quote(self.current_category)
+        todos = _api("GET", f"?category={cat_param}")
 
         if not todos:
             empty_frame = tk.Frame(self.scroll_frame, bg=BG)
@@ -335,17 +350,17 @@ class TodoApp:
         title = self.entry.get().strip()
         if not title or title == "What needs to be done?":
             return
-        models.add_todo(title, self.current_category)
+        _api("POST", "", {"title": title, "category": self.current_category})
         self.entry.delete(0, "end")
         self.refresh()
         self.entry.focus_set()
 
     def toggle_todo(self, todo_id: int) -> None:
-        models.toggle_todo(todo_id)
+        _api("PUT", f"/{todo_id}", {})
         self.refresh()
 
     def delete_todo(self, todo_id: int) -> None:
-        models.delete_todo(todo_id)
+        _api("DELETE", f"/{todo_id}")
         self.refresh()
 
     def run(self) -> None:
