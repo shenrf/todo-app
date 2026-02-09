@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Todo</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --surface: #ffffff;
+    --border: #e8e0d8;
+    --text: #2c2418;
+    --text-dim: #8a7e72;
+    --accent: #d97706;
+    --danger: #dc2626;
+    --done: #16a34a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .container { max-width: 600px; margin: 0 auto; padding: 20px 16px; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
+
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1; padding: 12px 0; text-align: center;
+    font-size: 15px; font-weight: 600;
+    background: var(--surface); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .tab.active {
+    background: var(--accent); color: #000;
+    border-color: var(--accent);
+  }
+
+  .add-form {
+    display: flex; gap: 8px; margin-bottom: 24px;
+  }
+  .add-form input {
+    flex: 1; padding: 14px 16px; font-size: 16px;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 12px;
+    outline: none;
+  }
+  .add-form input:focus { border-color: var(--accent); }
+  .add-form button {
+    padding: 14px 20px; font-size: 16px; font-weight: 600;
+    background: var(--accent); color: #000; border: none; border-radius: 12px;
+    cursor: pointer; white-space: nowrap;
+  }
+
+  .todo-list { list-style: none; }
+  .todo-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; margin-bottom: 8px;
+    background: var(--surface); border-radius: 12px;
+    border: 1px solid var(--border);
+    transition: opacity 0.2s;
+  }
+  .todo-item.completed { opacity: 0.5; }
+  .todo-item.completed .todo-title { text-decoration: line-through; }
+
+  .todo-check {
+    width: 26px; height: 26px; flex-shrink: 0;
+    border: 2px solid var(--border); border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .todo-item.completed .todo-check {
+    background: var(--done); border-color: var(--done);
+  }
+  .todo-item.completed .todo-check::after {
+    content: "\2713"; color: #000; font-size: 14px; font-weight: 700;
+  }
+
+  .todo-title { flex: 1; font-size: 16px; line-height: 1.4; }
+
+  .todo-delete {
+    width: 36px; height: 36px; flex-shrink: 0;
+    background: none; border: none; border-radius: 8px;
+    color: var(--text-dim); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .todo-delete:active { background: rgba(255,107,107,0.15); color: var(--danger); }
+
+  .empty {
+    text-align: center; color: var(--text-dim);
+    padding: 40px 0; font-size: 16px;
+  }
+
+  .count {
+    text-align: center; color: var(--text-dim);
+    font-size: 13px; margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Todo</h1>
+
+  <div class="tabs" id="tabs"></div>
+
+  <form class="add-form" onsubmit="return addTodo(event)">
+    <input id="input" type="text" placeholder="What needs to be done?" autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+  <ul class="todo-list" id="list"></ul>
+  <div class="count" id="count"></div>
+</div>
+
+<script>
+const API = window.location.origin + '/api/todos';
+const CATEGORIES = ['Ruofei', 'Ruiqi', 'Family'];
+let currentCategory = CATEGORIES[0];
+
+const list = document.getElementById('list');
+const input = document.getElementById('input');
+const countEl = document.getElementById('count');
+const tabsEl = document.getElementById('tabs');
+
+function renderTabs() {
+  tabsEl.innerHTML = CATEGORIES.map(c =>
+    `<div class="tab ${c === currentCategory ? 'active' : ''}" onclick="switchTab('${c}')">${c}</div>`
+  ).join('');
+}
+
+function switchTab(cat) {
+  currentCategory = cat;
+  renderTabs();
+  load();
+}
+
+async function load() {
+  const res = await fetch(`${API}?category=${encodeURIComponent(currentCategory)}`);
+  const todos = await res.json();
+  render(todos);
+}
+
+function render(todos) {
+  if (todos.length === 0) {
+    list.innerHTML = '<li class="empty">No todos yet</li>';
+    countEl.textContent = '';
+    return;
+  }
+  const remaining = todos.filter(t => !t.completed).length;
+  countEl.textContent = `${remaining} remaining of ${todos.length} total`;
+  list.innerHTML = todos.map(t => `
+    <li class="todo-item ${t.completed ? 'completed' : ''}" data-id="${t.id}">
+      <div class="todo-check" onclick="toggle(${t.id})"></div>
+      <span class="todo-title">${esc(t.title)}</span>
+      <button class="todo-delete" onclick="del(${t.id})">&times;</button>
+    </li>
+  `).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function addTodo(e) {
+  e.preventDefault();
+  const title = input.value.trim();
+  if (!title) return;
+  input.value = '';
+  await fetch(API, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, category: currentCategory})
+  });
+  load();
+}
+
+async function toggle(id) {
+  await fetch(`${API}/${id}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  load();
+}
+
+async function del(id) {
+  await fetch(`${API}/${id}`, {method: 'DELETE'});
+  load();
+}
+
+renderTabs();
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+todos.db
+todos.db-wal
+todos.db-shm
+.env
